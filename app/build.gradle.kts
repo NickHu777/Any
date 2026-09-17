@@ -4,6 +4,10 @@ plugins {
 }
 
 val ciVersionCode = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
+val signingStoreFile = System.getenv("ANY_KEYSTORE_FILE")
+val signingStorePassword = System.getenv("ANY_KEYSTORE_PASSWORD")
+val signingKeyAlias = System.getenv("ANY_KEY_ALIAS")
+val signingKeyPassword = System.getenv("ANY_KEY_PASSWORD")
 
 android {
     namespace = "com.any.app"
@@ -23,8 +27,26 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        create("release") {
+            if (signingStoreFile != null &&
+                signingStorePassword != null &&
+                signingKeyAlias != null &&
+                signingKeyPassword != null
+            ) {
+                storeFile = file(signingStoreFile)
+                storePassword = signingStorePassword
+                keyAlias = signingKeyAlias
+                keyPassword = signingKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         release {
+            if (signingStoreFile != null && signingStorePassword != null) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             optimization {
                 enable = false
             }
