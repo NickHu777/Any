@@ -16,7 +16,7 @@ data class GithubRelease(
 
 object AnyUpdateConfig {
     // Set this to "owner/repository" when the Any GitHub repository exists.
-    const val githubRepository = ""
+    const val githubRepository = "NickHu777/Any"
 }
 
 object AnyUpdateChecker {
