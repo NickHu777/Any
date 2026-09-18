@@ -119,8 +119,7 @@ jobs:
             true
           else
             release="$(curl -fsSL -X POST \
-              "https://gitee.com/api/v5/repos/${GITEE_OWNER}/Any/releases" \
-              -H "Authorization: Bearer ${GITEE_TOKEN}" \
+              "https://gitee.com/api/v5/repos/${GITEE_OWNER}/Any/releases?access_token=${GITEE_TOKEN}" \
               --data-urlencode "tag_name=${GITHUB_REF_NAME}" \
               --data-urlencode "name=Any ${GITHUB_REF_NAME}" \
               --data-urlencode "body=Mirrored from GitHub commit ${GITHUB_SHA}." \
