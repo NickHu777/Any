@@ -50,10 +50,6 @@ try {
         $giteeToken = Get-GitCredentialPassword
         $buildCode = [int](Get-Date -Format "yyMMddHHmm")
 
-        git tag -a $Tag -m "Any $Tag"
-        git push origin "refs/tags/$Tag"
-        git push github-backup "refs/tags/$Tag"
-
         $env:JAVA_HOME = $taskJdk
         $env:GITHUB_RUN_NUMBER = "$buildCode"
         $env:GITHUB_REF_NAME = $Tag
@@ -63,6 +59,10 @@ try {
         $env:ANY_KEY_PASSWORD = $signingPassword
         & .\gradlew.bat assembleRelease --console=plain
         if ($LASTEXITCODE -ne 0) { throw "Release APK build failed." }
+
+        git tag -a $Tag -m "Any $Tag"
+        git push origin "refs/tags/$Tag"
+        git push github-backup "refs/tags/$Tag"
 
         $releaseUrl = "https://gitee.com/api/v5/repos/$giteeOwner/$giteeRepo/releases/tags/$Tag?access_token=$giteeToken"
         $release = try { Invoke-CurlJson @('-sS', $releaseUrl) } catch { $null }
