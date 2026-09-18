@@ -440,7 +440,7 @@ private fun SettingsScreen(modifier: Modifier = Modifier) {
                 Button(
                     onClick = {
                         isChecking = true
-                        status = "正在检查 GitHub Release…"
+                        status = "正在检查国内更新源…"
                         downloadUrl = ""
                         sha256 = ""
                         AnyUpdateChecker.checkLatestRelease(
@@ -453,7 +453,7 @@ private fun SettingsScreen(modifier: Modifier = Modifier) {
                                 status = if (release.tagName in currentTags) {
                                     "当前已经是最新版本"
                                 } else {
-                                    "发现新版本 ${release.tagName}：${release.title}"
+                                    "发现新版本 ${release.tagName}：${release.title}（${release.source}）"
                                 }
                                 downloadUrl = release.downloadUrl
                                 sha256 = release.sha256

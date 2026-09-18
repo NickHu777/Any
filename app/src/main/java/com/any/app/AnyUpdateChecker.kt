@@ -13,11 +13,12 @@ data class GithubRelease(
     val releaseUrl: String,
     val assetUrls: List<String>,
     val downloadUrl: String,
-    val sha256: String
+    val sha256: String,
+    val source: String
 )
 
 object AnyUpdateConfig {
-    // Set this to "owner/repository" when the Any GitHub repository exists.
+    const val giteeRepository = "doggy-original-licensing/Any"
     const val githubRepository = "NickHu777/Any"
 }
 
@@ -26,67 +27,69 @@ object AnyUpdateChecker {
     private val mainHandler = Handler(Looper.getMainLooper())
 
     fun checkLatestRelease(
-        repository: String = AnyUpdateConfig.githubRepository,
         onSuccess: (GithubRelease) -> Unit,
         onError: (String) -> Unit
     ) {
-        if (!repository.matches(Regex("^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"))) {
-            mainHandler.post { onError("尚未配置有效的 GitHub 仓库") }
-            return
-        }
-
         executor.execute {
-            try {
-                val connection = (URL(
-                    "https://api.github.com/repos/$repository/releases/latest"
-                ).openConnection() as HttpURLConnection).apply {
-                    requestMethod = "GET"
-                    connectTimeout = 8_000
-                    readTimeout = 8_000
-                    setRequestProperty("Accept", "application/vnd.github+json")
-                    setRequestProperty("User-Agent", "Any-Android-App")
-                }
-
+            val sources = listOf(
+                "Gitee" to "https://gitee.com/api/v5/repos/${AnyUpdateConfig.giteeRepository}/releases/latest",
+                "GitHub" to "https://api.github.com/repos/${AnyUpdateConfig.githubRepository}/releases/latest"
+            )
+            var lastError = "检查更新失败"
+            for ((source, apiUrl) in sources) {
                 try {
-                    if (connection.responseCode !in 200..299) {
-                        throw IllegalStateException("GitHub 返回 HTTP ${connection.responseCode}")
+                    val release = fetchRelease(apiUrl, source)
+                    if (release.downloadUrl.isNotBlank()) {
+                        mainHandler.post { onSuccess(release) }
+                        return@execute
                     }
-
-                    val body = connection.inputStream.bufferedReader().use { it.readText() }
-                    val json = JSONObject(body)
-                    val assets = buildList {
-                        val items = json.optJSONArray("assets") ?: return@buildList
-                        for (index in 0 until items.length()) {
-                            items.optJSONObject(index)
-                                ?.optString("browser_download_url")
-                                ?.takeIf { it.isNotBlank() }
-                                ?.let(::add)
-                        }
-                    }
-                    val firstAsset = json.optJSONArray("assets")
-                        ?.optJSONObject(0)
-                    val digest = firstAsset
-                        ?.optString("digest", "")
-                        ?.removePrefix("sha256:")
-                        .orEmpty()
-                    mainHandler.post {
-                        onSuccess(
-                            GithubRelease(
-                                tagName = json.optString("tag_name", "未知版本"),
-                                title = json.optString("name", "Any 最新版本"),
-                                releaseUrl = json.optString("html_url", ""),
-                                assetUrls = assets,
-                                downloadUrl = firstAsset?.optString("browser_download_url", "").orEmpty(),
-                                sha256 = digest
-                            )
-                        )
-                    }
-                } finally {
-                    connection.disconnect()
+                    lastError = "$source 没有可用 APK"
+                } catch (error: Exception) {
+                    lastError = "$source：${error.message ?: "请求失败"}"
                 }
-            } catch (error: Exception) {
-                mainHandler.post { onError(error.message ?: "检查更新失败") }
             }
+            mainHandler.post { onError(lastError) }
+        }
+    }
+
+    private fun fetchRelease(apiUrl: String, source: String): GithubRelease {
+        val connection = (URL(apiUrl).openConnection() as HttpURLConnection).apply {
+            requestMethod = "GET"
+            connectTimeout = 8_000
+            readTimeout = 8_000
+            setRequestProperty("Accept", "application/vnd.github+json")
+            setRequestProperty("User-Agent", "Any-Android-App")
+        }
+        try {
+            if (connection.responseCode !in 200..299) {
+                throw IllegalStateException("HTTP ${connection.responseCode}")
+            }
+            val json = JSONObject(connection.inputStream.bufferedReader().use { it.readText() })
+            val assets = buildList {
+                val items = json.optJSONArray("assets") ?: return@buildList
+                for (index in 0 until items.length()) {
+                    items.optJSONObject(index)
+                        ?.optString("browser_download_url")
+                        ?.takeIf { it.isNotBlank() }
+                        ?.let(::add)
+                }
+            }
+            val apkAsset = json.optJSONArray("assets")?.let { items ->
+                (0 until items.length())
+                    .mapNotNull { items.optJSONObject(it) }
+                    .firstOrNull { it.optString("name").endsWith(".apk", ignoreCase = true) }
+            }
+            return GithubRelease(
+                tagName = json.optString("tag_name", "未知版本"),
+                title = json.optString("name", "Any 最新版本"),
+                releaseUrl = json.optString("html_url", ""),
+                assetUrls = assets,
+                downloadUrl = apkAsset?.optString("browser_download_url", "").orEmpty(),
+                sha256 = apkAsset?.optString("digest", "")?.removePrefix("sha256:").orEmpty(),
+                source = source
+            )
+        } finally {
+            connection.disconnect()
         }
     }
 }
