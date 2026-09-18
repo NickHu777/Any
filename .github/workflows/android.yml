@@ -115,9 +115,8 @@ jobs:
         run: |
           set -euo pipefail
           release_url="https://gitee.com/api/v5/repos/${GITEE_OWNER}/Any/releases/tags/${GITHUB_REF_NAME}"
-          if release="$(curl -fsSL "${release_url}?access_token=${GITEE_TOKEN}")"; then
-            true
-          else
+          release="$(curl -fsSL "${release_url}?access_token=${GITEE_TOKEN}" || true)"
+          if [[ "$(jq -r '.id // "null"' <<<"${release}")" == "null" ]]; then
             release="$(curl -fsSL -X POST \
               "https://gitee.com/api/v5/repos/${GITEE_OWNER}/Any/releases?access_token=${GITEE_TOKEN}" \
               --data-urlencode "tag_name=${GITHUB_REF_NAME}" \
