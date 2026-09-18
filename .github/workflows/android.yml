@@ -118,20 +118,18 @@ jobs:
           if release="$(curl -fsSL "${release_url}?access_token=${GITEE_TOKEN}")"; then
             true
           else
-            release_json="$(jq -n \
-              --arg tag "${GITHUB_REF_NAME}" \
-              --arg name "Any ${GITHUB_REF_NAME}" \
-              --arg body "Mirrored from GitHub commit ${GITHUB_SHA}." \
-              --arg target "${GITHUB_SHA}" \
-              '{tag_name:$tag,name:$name,body:$body,target_commitish:$target,prerelease:false}')"
             release="$(curl -fsSL -X POST \
-              "https://gitee.com/api/v5/repos/${GITEE_OWNER}/Any/releases?access_token=${GITEE_TOKEN}" \
-              -H "Content-Type: application/json" \
-              --data "${release_json}")"
+              "https://gitee.com/api/v5/repos/${GITEE_OWNER}/Any/releases" \
+              -H "Authorization: Bearer ${GITEE_TOKEN}" \
+              --data-urlencode "tag_name=${GITHUB_REF_NAME}" \
+              --data-urlencode "name=Any ${GITHUB_REF_NAME}" \
+              --data-urlencode "body=Mirrored from GitHub commit ${GITHUB_SHA}." \
+              --data-urlencode "target_commitish=main" \
+              --data-urlencode "prerelease=false")"
           fi
           release_id="$(jq -r '.id' <<<"${release}")"
           if [[ -z "${release_id}" || "${release_id}" == "null" ]]; then
-            echo "Unable to create Gitee release" >&2
+            echo "Unable to create Gitee release: ${release}" >&2
             exit 1
           fi
           assets="$(curl -fsSL "https://gitee.com/api/v5/repos/${GITEE_OWNER}/Any/releases/${release_id}/attach_files?access_token=${GITEE_TOKEN}")"
