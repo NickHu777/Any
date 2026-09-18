@@ -106,7 +106,7 @@ jobs:
           fi
 
           git remote add gitee "https://oauth2:${GITEE_TOKEN}@gitee.com/${gitee_owner}/Any.git"
-          git push --mirror gitee
+          git push --force gitee "refs/heads/*:refs/heads/*" "refs/tags/*:refs/tags/*"
 
       - name: Create Gitee Release and upload APK
         if: startsWith(github.ref, 'refs/tags/v')
