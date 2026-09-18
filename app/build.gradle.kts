@@ -4,6 +4,9 @@ plugins {
 }
 
 val ciVersionCode = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
+val taggedVersionName = System.getenv("GITHUB_REF_NAME")
+    ?.takeIf { it.matches(Regex("^v\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?$")) }
+    ?.removePrefix("v")
 val signingStoreFile = System.getenv("ANY_KEYSTORE_FILE")
 val signingStorePassword = System.getenv("ANY_KEYSTORE_PASSWORD")
 val signingKeyAlias = System.getenv("ANY_KEY_ALIAS")
@@ -22,7 +25,7 @@ android {
         minSdk = 28
         targetSdk = 36
         versionCode = ciVersionCode
-        versionName = "0.1.0"
+        versionName = taggedVersionName ?: "0.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
