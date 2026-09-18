@@ -114,21 +114,33 @@ jobs:
           GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
         run: |
           set -euo pipefail
-          release_json="$(jq -n \
-            --arg tag "${GITHUB_REF_NAME}" \
-            --arg name "Any ${GITHUB_REF_NAME}" \
-            --arg body "Mirrored from GitHub commit ${GITHUB_SHA}." \
-            --arg target "${GITHUB_SHA}" \
-            '{tag_name:$tag,name:$name,body:$body,target_commitish:$target,prerelease:false}')"
-          release="$(curl -fsSL -X POST \
-            "https://gitee.com/api/v5/repos/${GITEE_OWNER}/Any/releases?access_token=${GITEE_TOKEN}" \
-            -H "Content-Type: application/json" \
-            --data "${release_json}")"
+          release_url="https://gitee.com/api/v5/repos/${GITEE_OWNER}/Any/releases/tags/${GITHUB_REF_NAME}"
+          if release="$(curl -fsSL "${release_url}?access_token=${GITEE_TOKEN}")"; then
+            true
+          else
+            release_json="$(jq -n \
+              --arg tag "${GITHUB_REF_NAME}" \
+              --arg name "Any ${GITHUB_REF_NAME}" \
+              --arg body "Mirrored from GitHub commit ${GITHUB_SHA}." \
+              --arg target "${GITHUB_SHA}" \
+              '{tag_name:$tag,name:$name,body:$body,target_commitish:$target,prerelease:false}')"
+            release="$(curl -fsSL -X POST \
+              "https://gitee.com/api/v5/repos/${GITEE_OWNER}/Any/releases?access_token=${GITEE_TOKEN}" \
+              -H "Content-Type: application/json" \
+              --data "${release_json}")"
+          fi
           release_id="$(jq -r '.id' <<<"${release}")"
           if [[ -z "${release_id}" || "${release_id}" == "null" ]]; then
             echo "Unable to create Gitee release" >&2
             exit 1
           fi
-          curl -fsSL -X POST \
-            "https://gitee.com/api/v5/repos/${GITEE_OWNER}/Any/releases/${release_id}/attach_files?access_token=${GITEE_TOKEN}" \
-            -F "file=@app/build/outputs/apk/release/app-release.apk" >/dev/null
+          assets="$(curl -fsSL "https://gitee.com/api/v5/repos/${GITEE_OWNER}/Any/releases/${release_id}/attach_files?access_token=${GITEE_TOKEN}")"
+          if ! jq -e '.[] | select(.name == "app-release.apk")' <<<"${assets}" >/dev/null; then
+            curl --fail --show-error --silent --max-time 300 -H "Expect:" \
+              -F "access_token=${GITEE_TOKEN}" \
+              -F "owner=${GITEE_OWNER}" \
+              -F "repo=Any" \
+              -F "release_id=${release_id}" \
+              -F "file=@app/build/outputs/apk/release/app-release.apk" \
+              "https://gitee.com/api/v5/repos/${GITEE_OWNER}/Any/releases/${release_id}/attach_files" >/dev/null
+          fi
