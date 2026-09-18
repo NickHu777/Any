@@ -1,7 +1,5 @@
 package com.any.app
 
-import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -43,7 +41,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -414,8 +411,10 @@ private fun PluginCard(
 private fun SettingsScreen(modifier: Modifier = Modifier) {
     val context = LocalContext.current
     var isChecking by remember { mutableStateOf(false) }
+    var isDownloading by remember { mutableStateOf(false) }
     var status by rememberSaveable { mutableStateOf("检查 Any 是否有新版本") }
-    var releaseUrl by rememberSaveable { mutableStateOf("") }
+    var downloadUrl by rememberSaveable { mutableStateOf("") }
+    var sha256 by rememberSaveable { mutableStateOf("") }
 
     Column(
         modifier = modifier
@@ -442,7 +441,8 @@ private fun SettingsScreen(modifier: Modifier = Modifier) {
                     onClick = {
                         isChecking = true
                         status = "正在检查 GitHub Release…"
-                        releaseUrl = ""
+                        downloadUrl = ""
+                        sha256 = ""
                         AnyUpdateChecker.checkLatestRelease(
                             onSuccess = { release ->
                                 isChecking = false
@@ -455,7 +455,8 @@ private fun SettingsScreen(modifier: Modifier = Modifier) {
                                 } else {
                                     "发现新版本 ${release.tagName}：${release.title}"
                                 }
-                                releaseUrl = release.releaseUrl
+                                downloadUrl = release.downloadUrl
+                                sha256 = release.sha256
                             },
                             onError = { message ->
                                 isChecking = false
@@ -467,22 +468,38 @@ private fun SettingsScreen(modifier: Modifier = Modifier) {
                 ) {
                     Text(if (isChecking) "检查中…" else "检查更新")
                 }
+                if (downloadUrl.isNotBlank()) {
+                    Button(
+                        onClick = {
+                            isDownloading = true
+                            status = "正在下载更新…"
+                            ApkUpdater.downloadAndInstall(
+                                context = context,
+                                downloadUrl = downloadUrl,
+                                expectedSha256 = sha256,
+                                onProgress = { progress ->
+                                    status = "正在下载更新… $progress%"
+                                },
+                                onReady = {
+                                    isDownloading = false
+                                    status = "下载完成，等待系统安装确认"
+                                },
+                                onError = { message ->
+                                    isDownloading = false
+                                    status = message
+                                }
+                            )
+                        },
+                        enabled = !isDownloading && !isChecking
+                    ) {
+                        Text(if (isDownloading) "下载中…" else "下载并安装更新")
+                    }
+                }
                 Text(
                     status,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodyMedium
                 )
-                if (releaseUrl.isNotBlank()) {
-                    OutlinedButton(
-                        onClick = {
-                            context.startActivity(
-                                Intent(Intent.ACTION_VIEW, Uri.parse(releaseUrl))
-                            )
-                        }
-                    ) {
-                        Text("打开 Release 页面")
-                    }
-                }
             }
         }
     }

@@ -11,7 +11,9 @@ data class GithubRelease(
     val tagName: String,
     val title: String,
     val releaseUrl: String,
-    val assetUrls: List<String>
+    val assetUrls: List<String>,
+    val downloadUrl: String,
+    val sha256: String
 )
 
 object AnyUpdateConfig {
@@ -61,13 +63,21 @@ object AnyUpdateChecker {
                                 ?.let(::add)
                         }
                     }
+                    val firstAsset = json.optJSONArray("assets")
+                        ?.optJSONObject(0)
+                    val digest = firstAsset
+                        ?.optString("digest", "")
+                        ?.removePrefix("sha256:")
+                        .orEmpty()
                     mainHandler.post {
                         onSuccess(
                             GithubRelease(
                                 tagName = json.optString("tag_name", "未知版本"),
                                 title = json.optString("name", "Any 最新版本"),
                                 releaseUrl = json.optString("html_url", ""),
-                                assetUrls = assets
+                                assetUrls = assets,
+                                downloadUrl = firstAsset?.optString("browser_download_url", "").orEmpty(),
+                                sha256 = digest
                             )
                         )
                     }
